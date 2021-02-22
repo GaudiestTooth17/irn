@@ -1,5 +1,3 @@
-module DiseaseSim
-
 using LightGraphs, Dates
 include("sim.jl")
 include("fileio.jl")
@@ -20,11 +18,9 @@ function main()
 
     starting_time = Dates.now()
     for i = 1:num_sims
-        simulate(adj_matrix, starting_seir, disease)
+        simulate(adj_matrix, starting_seir, disease, 1000)
     end
     println("Done ($(Dates.now() - starting_time))")
 end
 
 main()
-
-end # module
