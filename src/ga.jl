@@ -84,14 +84,17 @@ end
 
 function make_example_observer(max_steps::Int)
     max_fitnesses = zeros(max_steps)
+    pop_diversity = zeros(max_steps)
     steps_taken = 0
     function observer(fitness_to_genotype, most_fit)
         steps_taken += 1
         max_fitnesses[steps_taken] = most_fit[1]
+        unique_genotypes = Set(map(x->x[2], fitness_to_genotype))
+        pop_diversity[steps_taken] = length(unique_genotypes) / length(fitness_to_genotype)
         # println(steps_taken)
     end
     function reporter()
-        max_fitnesses[1:steps_taken]
+        max_fitnesses[1:steps_taken], pop_diversity[1:steps_taken]
     end
     observer, reporter
 end
@@ -106,16 +109,23 @@ function tuple_max(tuples, important_index)
     max_val
 end
 
-start_time = Dates.now()
-println("Beginning.")
-pop_size = 20
-sequence_length = 10
-max_fitness = example_fitness([i for i=1:sequence_length])
-max_steps = 1000
-observe, report = make_example_observer(max_steps)
-population = [abs.(rand(Int, sequence_length)) .% sequence_length .+ 1 for i=1:pop_size]
-answer = optimize(example_fitness, example_next_gen, observe, max_steps, population, max_fitness)
-println(answer)
-println("Finished $(Dates.now()-start_time)")
-display(plot(report()))
-readline()
+if abspath(PROGRAM_FILE) == @__FILE__
+    start_time = Dates.now()
+    println("Beginning.")
+    pop_size = 20
+    sequence_length = 10
+    max_fitness = example_fitness([i for i=1:sequence_length])
+    max_steps = 1000
+
+    observe, report = make_example_observer(max_steps)
+    population = [abs.(rand(Int, sequence_length)) .% sequence_length .+ 1 for i=1:pop_size]
+    answer = optimize(example_fitness, example_next_gen, observe, max_steps, population, max_fitness)
+
+    println(answer)
+    println("Finished $(Dates.now()-start_time)")
+    max_fitnesses_over_time, pop_diversity = report()
+    display(plot(max_fitnesses_over_time))
+    readline()
+    display(plot(pop_diversity))
+    readline()
+end

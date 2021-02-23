@@ -23,4 +23,6 @@ function main()
     println("Done ($(Dates.now() - starting_time))")
 end
 
-main()
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end
