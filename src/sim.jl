@@ -7,8 +7,10 @@ struct Dizeez
     transmission_prob::Float64
 end
 
-"Use the disease to make the next SEIR matrix also returns whether or not the old one differs from the new"
-function next_seir(old_seir::Matrix{Integer}, adj_matrix::Matrix{Integer}, disease::Dizeez)::Tuple{Matrix{Integer}, Bool}
+# "Use the disease to make the next SEIR matrix also returns whether or not the old one differs from the new"
+function next_seir(old_seir::Matrix{Int}, adj_matrix::Matrix{T},
+    disease::Dizeez)::Tuple{Matrix{T}, Bool} where T
+
     # keep track of whether or not any values were changed from the original matrix
     update_occurred = false
     seir = copy(old_seir)
@@ -35,8 +37,8 @@ function next_seir(old_seir::Matrix{Integer}, adj_matrix::Matrix{Integer}, disea
     return seir, any(to_r_filter) || any(to_i_filter) || any(to_e_filter)
 end
 
-function simulate(adj_matrix::AbstractMatrix{Int}, starting_seir::AbstractMatrix{Int}, disease::Dizeez, max_steps::Int)
-    seirs = Array{Union{AbstractMatrix{Int}, Nothing}}(nothing, max_steps)
+function simulate(adj_matrix::Matrix{T}, starting_seir::Matrix{Int}, disease::Dizeez, max_steps::Int) where T
+    seirs = Vector{Matrix{Int}}(undef, max_steps)
     seirs[1] = copy(starting_seir)
 
     for step = 2:max_steps
@@ -52,11 +54,29 @@ function simulate(adj_matrix::AbstractMatrix{Int}, starting_seir::AbstractMatrix
     seirs
 end
 
-function make_starting_seir(num_nodes::Int, num_infected::Int)::AbstractMatrix{Int}
+function make_starting_seir(num_nodes::Int, num_infected::Int)::Matrix{Int}
     seir = zeros(num_nodes, 4)
     to_infect = Random.shuffle(1:num_nodes)[1:num_infected]
     seir[:, 1] .= 1
     seir[to_infect, 1] .= 0
     seir[to_infect, 3] .= 1
     seir
+end
+
+function calc_remaining_S_nodes(seirs::Vector{Matrix{Int}})::Int
+    sum(seirs[end][:, 1])
+end
+
+function run_sim_batch(adj_matrix::Matrix{T}, starting_seir::Matrix{Int},
+    disease::Dizeez, max_steps::Int, num_sims::Int)::Vector{Int} where T
+
+    # vector_of_remaining_S_nodes = zeros(Int, num_sims)
+    vector_of_remaining_S_nodes = map(i->calc_remaining_S_nodes(
+        simulate(adj_matrix, starting_seir, disease, max_steps)),
+        1:num_sims)
+    # for sim=1:num_sims
+    #     seirs = simulate(adj_matrix, starting_seir, disease, max_steps)
+    #     vector_of_remaining_S_nodes[sim] = calc_remaining_S_nodes(seirs)
+    # end
+    vector_of_remaining_S_nodes
 end

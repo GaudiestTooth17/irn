@@ -7,19 +7,29 @@ Genotype = Vector
 Population = Vector{Genotype}
 
 """
-A genotype is an array of Numbers. fitness_func takes in the population and returns fitness for each. next_gen_
+make_optimizer aggregates its parameters to create a closure that acts as the body of a GA optimization loop
+fitness_fn takes a genotype and returns a fitness value. This must not exceed max_fitness.
+next_gen_fn takes the maximum fitness a genotype can have and sorted list of (fitness, genotype) ordered from
+highest to lowest fitness and returns a vector of genotypes to be the next generation.
+max_fitness is a Real that is the highest a genotype could possibly score in the fitness_fn.
+starting_population is the population of genotypes that the optimizer begins with.
 """
-function optimize(fitness_fn, next_gen_fn, observer_fn, max_steps, population, max_fitness)
+function make_optimizer(fitness_fn, next_gen_fn, max_fitness, starting_population)
+    population = starting_population
     rand_genotype = rand(population)
     most_fit = (fitness_fn(rand_genotype), rand_genotype)
-    for step = 1:max_steps
-        fitness_to_genotype = [(fitness_fn(genotype), genotype) for genotype in population]
+
+    function optimizer_step(verbose::Bool=false)
+        fitness_to_genotype = [(fitness_fn(gen), gen) for gen in population]
         sort!(fitness_to_genotype, by=first, rev=true)  # sort the array in place from highest fitness to lowest
         most_fit = tuple_max([most_fit, fitness_to_genotype[1]], 1)
         population = next_gen_fn(max_fitness, fitness_to_genotype)
-        observer_fn(fitness_to_genotype, most_fit)
+        if verbose
+            println("End of step $step.")
+        end
+        most_fit, fitness_to_genotype
     end
-    most_fit
+    optimizer_step
 end
 
 function calc_normalized_fitnesses(max_fitness::Real, fitnesses)
@@ -119,9 +129,15 @@ if abspath(PROGRAM_FILE) == @__FILE__
 
     observe, report = make_example_observer(max_steps)
     population = [abs.(rand(Int, sequence_length)) .% sequence_length .+ 1 for i=1:pop_size]
-    answer = optimize(example_fitness, example_next_gen, observe, max_steps, population, max_fitness)
+    optimizer_step = make_optimizer(example_fitness, example_next_gen, max_fitness, population)
+    best_answer = missing
+    for i=1:max_steps
+        global best_answer
+        best_answer, fitness_to_answer = optimizer_step()
+        observe(fitness_to_answer, best_answer)
+    end
 
-    println(answer)
+    println(best_answer)
     println("Finished $(Dates.now()-start_time)")
     max_fitnesses_over_time, pop_diversity = report()
     display(plot(max_fitnesses_over_time))
