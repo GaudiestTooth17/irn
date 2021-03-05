@@ -1,7 +1,5 @@
 using Plots
-using LightGraphs
-using Dates
-using LightGraphs
+using LightGraphs, ProgressBars, Printf
 
 include("ga.jl")
 include("fileio.jl")
@@ -17,9 +15,24 @@ function genotype_to_adj_matrix(genotype::Vector{Int8})::Matrix{Int8}
         for j = i+1:size(adj_matrix, 2)
             adj_matrix[i, j] = genotype[current_edge]
             adj_matrix[j, i] = genotype[current_edge]
+            current_edge += 1
         end
     end
     adj_matrix
+end
+
+function adj_matrix_to_genotype(M::AbstractMatrix)::Vector{Int8}
+    num_nodes = size(M, 1)
+    # genotype contains an entry for every edge on the graph
+    genotype = zeros(Int8, (num_nodes*(num_nodes-1) ÷ 2))
+    current_loc = 1
+    for i = 1:size(M, 1)
+        for j = i+1:size(M, 2)
+            genotype[current_loc] = M[i, j]
+            current_loc += 1
+        end
+    end
+    genotype
 end
 
 function graph_fitness(genotype::Vector{Int8})::Float64
@@ -69,19 +82,22 @@ function next_graph_generation(max_fitness::Float64,
                     for i=1:div(length(population), 2))
     children = collect(flatten((crossover(parents...)
                                 for parents in parent_pairs)))
-    mutate_graph!(children, .05)
+    mutate_graph!(children, .0)
     children
 end
 
 function make_observer(max_steps::Int)
     max_fitnesses = zeros(max_steps)
+    pop_diversity = zeros(max_steps)
     steps_taken = 0
     function observe(fitness_to_genotype, most_fit)
         steps_taken += 1
         max_fitnesses[steps_taken] = most_fit[1]
+        unique_genotypes = Set(map(x->x[2], fitness_to_genotype))
+        pop_diversity[steps_taken] = length(unique_genotypes) / length(fitness_to_genotype)
     end
     function report()
-        max_fitnesses[1:steps_taken]
+        max_fitnesses[1:steps_taken], pop_diversity[1:steps_taken]
     end
     observe, report
 end
@@ -90,14 +106,19 @@ function make_starting_population(num_nodes::Int, pop_size::Int)
     # generate values for each of the edges
     # Only generate half-ish of the edges because the matrix is symmetric
     # subtract pop_size from the amount to account for zeros along the diagonal (no self-loops)
+    # pop = [adj_matrix_to_genotype(adjacency_matrix(barabasi_albert(num_nodes, 3, 3, seed=0)))
+    #        for i=1:pop_size]
     pop = [Int8.(abs.(rand(Int8, div(num_nodes*(num_nodes+1), 2) - num_nodes)) .% 2)
            for i=1:pop_size]
+    # for (i, gen) in enumerate(pop)
+    #     if !is_connected(Graph(genotype_to_adj_matrix(gen)))
+    #         println("Graph $i is not connected.")
+    #     end
+    # end
     pop
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    start_time = Dates.now()
-    println("Beginning.")
     max_steps = 10
     num_nodes = 500
     pop_size = 40
@@ -105,17 +126,25 @@ if abspath(PROGRAM_FILE) == @__FILE__
     starting_pop = make_starting_population(num_nodes, pop_size)
     observe, report = make_observer(max_steps)
     take_step = make_optimizer(graph_fitness, next_graph_generation, max_fitness, starting_pop)
+
+    progress_bar = ProgressBar(1:max_steps)
     best_graph = missing
-    for i=1:max_steps
+    for i in progress_bar
         global best_graph
         (best_fitness, best_graph), fitness_to_answer = take_step()
         observe(fitness_to_answer, (best_fitness, best_graph))
-        println("End of step $i.")
+        set_description(progress_bar, string(@sprintf("Best Fitness %.3f", best_fitness)))
     end
-    println("Done.")
-    println(report())
-    # display(plot(report()))
-    # readline()
+
+    max_fitness, pop_diversity = report()
+    println("Max fitnesses")
+    println(max_fitness)
+    println("Population Diversity")
+    println(pop_diversity)
+    display(plot(max_fitness))
+    readline()
+    display(plot(pop_diversity))
+    readline()
     M = genotype_to_adj_matrix(best_graph)
     num_compenents = length(connected_components(Graph(M)))
     println("num components: $num_compenents")
@@ -123,5 +152,4 @@ if abspath(PROGRAM_FILE) == @__FILE__
         println("diameter: $(diameter(Graph(M)))")
     end
     write_adj_list("evolved.txt", M)
-    println("Done ($(Dates.now()-start_time))")
 end
