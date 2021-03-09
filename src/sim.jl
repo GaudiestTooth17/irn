@@ -1,6 +1,8 @@
 using Random
 include("datastructures.jl")
 
+# TODO: try visualizing a simulation to verify that it's running correctly
+
 struct Dizeez
     days_exposed::Int
     days_infectious::Int
@@ -40,17 +42,31 @@ end
 function simulate(adj_matrix::Matrix{T}, starting_seir::Matrix{Int}, disease::Dizeez, max_steps::Int) where T
     seirs = Vector{Matrix{Int}}(undef, max_steps)
     seirs[1] = copy(starting_seir)
+    num_nodes = size(adj_matrix, 1)
 
     for step = 2:max_steps
-        seirs[step], kontinue = next_seir(seirs[step-1], adj_matrix, disease)
-        # This could slow down the simulation a lot
-        # My preliminary test (caveman and 1000 steps) suggests that it doesn't
-        # significantly slow it down.
-        # Maybe a faster check could be added in next_seir
-        if !kontinue
+        seirs[step], states_changed = next_seir(seirs[step-1], adj_matrix, disease)
+        # if no states have changed and all the nodes have been infected, cut the sim short
+        # because there isn't anything interesting left to simulate
+        all_nodes_infected = length(seirs[step][:, 4][seirs[step][:, 4] .> 0]) == num_nodes
+        if !states_changed && all_nodes_infected
+            # println("All nodes infected after $step steps.")
             return seirs[1:step]
         end
+        disease_gone = (sum(seirs[step][:, 2]) + sum(seirs[step][:, 3])) == 0
+        # if the disease is completely gone, there is no need to continue the actual simulation,
+        # but it is important for the genetic algorithm to be able to reward this network for being
+        # resistant to the disease by having a longer simulation.
+        if !states_changed && disease_gone
+            # println("Disease is gone.")
+            for i=step:max_steps
+                seirs[i] = copy(seirs[step])
+            end
+            return seirs
+        end
     end
+
+    # println("Ending normally")
     seirs
 end
 
@@ -70,13 +86,9 @@ end
 function run_sim_batch(adj_matrix::Matrix{T}, starting_seir::Matrix{Int},
     disease::Dizeez, max_steps::Int, num_sims::Int)::Vector{Int} where T
 
-    # vector_of_remaining_S_nodes = zeros(Int, num_sims)
-    vector_of_remaining_S_nodes = map(i->calc_remaining_S_nodes(
-        simulate(adj_matrix, starting_seir, disease, max_steps)),
-        1:num_sims)
-    # for sim=1:num_sims
-    #     seirs = simulate(adj_matrix, starting_seir, disease, max_steps)
-    #     vector_of_remaining_S_nodes[sim] = calc_remaining_S_nodes(seirs)
-    # end
-    vector_of_remaining_S_nodes
+    # vector_of_remaining_S_nodes = map(i->calc_remaining_S_nodes(
+    #     simulate(adj_matrix, starting_seir, disease, max_steps)),
+    #     1:num_sims)
+    sim_lengths = [length(simulate(adj_matrix, starting_seir, disease, max_steps))]
+    sim_lengths
 end

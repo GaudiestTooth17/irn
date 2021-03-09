@@ -22,7 +22,8 @@ function make_optimizer(fitness_fn, next_gen_fn, max_fitness, starting_populatio
     function optimizer_step(verbose::Bool=false)
         fitness_to_genotype = [(fitness_fn(gen), gen) for gen in population]
         sort!(fitness_to_genotype, by=first, rev=true)  # sort the array in place from highest fitness to lowest
-        most_fit = tuple_max([most_fit, fitness_to_genotype[1]], 1)
+        # most_fit = tuple_max([most_fit, fitness_to_genotype[1]], 1)
+        most_fit = fitness_to_genotype[1]
         population = next_gen_fn(max_fitness, fitness_to_genotype)
         if verbose
             println("End of step $step.")
