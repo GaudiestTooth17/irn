@@ -2,6 +2,7 @@ using Plots
 using Dates
 using StatsBase
 using Base.Iterators: flatten
+using Distributed
 
 Genotype = Vector
 Population = Vector{Genotype}
@@ -19,8 +20,12 @@ function make_optimizer(fitness_fn, next_gen_fn, max_fitness, starting_populatio
     rand_genotype = rand(population)
     most_fit = (fitness_fn(rand_genotype), rand_genotype)
 
-    function optimizer_step(verbose::Bool=false)
-        fitness_to_genotype = [(fitness_fn(gen), gen) for gen in population]
+    function optimizer_step(verbose::Bool=false, parallel::Bool=true)
+        fitness_to_genotype = if parallel
+            pmap(genotype->(fitness_fn(genotype), genotype), population)
+        else
+            [(fitness_fn(gen), gen) for gen in population]
+        end
         sort!(fitness_to_genotype, by=first, rev=true)  # sort the array in place from highest fitness to lowest
         # most_fit = tuple_max([most_fit, fitness_to_genotype[1]], 1)
         most_fit = fitness_to_genotype[1]

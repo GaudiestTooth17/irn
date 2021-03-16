@@ -1,14 +1,15 @@
-using Plots
-using LightGraphs, ProgressBars, Printf, Random
-
+using Plots, ProgressBars, Printf, Distributed
+addprocs(6)
+@everywhere using LightGraphs, Random, Statistics
 include("ga.jl")
 include("fileio.jl")
+@everywhere include("sim.jl")
 
 function second(tup)
     tup[2]
 end
 
-function genotype_to_adj_matrix(genotype::Vector{Int8})::Matrix{Int8}
+@everywhere function genotype_to_adj_matrix(genotype::Vector{Int8})::Matrix{Int8}
     # if calculating num_nodes fails, it is probably because the genotype
     # just doesn't have the right number of entries.
     # This is basically the inverse of the triangular sum.
@@ -39,7 +40,7 @@ function adj_matrix_to_genotype(M::AbstractMatrix)::Vector{Int8}
     genotype
 end
 
-function graph_fitness(genotype::Vector{Int8})::Float64
+@everywhere function graph_fitness(genotype::Vector{Int8})::Float64
     # Graphs are rated on 3 different categories that each have a max of 1.0
     edge_rating = (length(genotype) - sum(genotype)) / length(genotype)
     M = genotype_to_adj_matrix(genotype)
@@ -48,20 +49,19 @@ function graph_fitness(genotype::Vector{Int8})::Float64
     largest_component = maximum(length, components)
     num_nodes = length(vertices(G))
     max_sim_steps = 300
-    num_sims = 1000
+    num_sims = 100
     max_edges = num_nodes * (num_nodes - 1) ÷ 2
     if is_connected(G)
         disease = Dizeez(3, 10, .5)
         sim_lens = run_sim_batch(M, make_starting_seir(num_nodes, 5),
                                  disease, max_sim_steps, num_sims)
-        avg_sim_len = sum(sim_lens) / length(sim_lens)
-        return 1 + avg_sim_len / max_sim_steps + edge_rating
+        return 1 + median(sim_lens) / max_sim_steps + edge_rating
     else
         return length(largest_component) / num_nodes + edge_rating
     end
 end
 
-function mutate_genotype!(genotype::Vector{T}, prob::Float64) where T
+@everywhere function mutate_genotype!(genotype::Vector{T}, prob::Float64) where T
     for i = 1:length(genotype)
         if prob > rand()
             genotype[i] = 1 - genotype[i]
@@ -69,7 +69,7 @@ function mutate_genotype!(genotype::Vector{T}, prob::Float64) where T
     end
 end
 
-function next_graph_generation(max_fitness::Float64,
+@everywhere function next_graph_generation(max_fitness::Float64,
     population::Vector{Tuple{Float64, Vector{T}}})::Vector{Vector{T}} where T
 
     # parent_pairs = (roullete_wheel_selection(max_fitness, population)
@@ -113,21 +113,18 @@ function make_starting_population(num_nodes::Int, pop_size::Int)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    max_steps = 1000
+    max_steps = 500
     num_nodes = 500
     pop_size = 20
     max_fitness = 3.0
     starting_pop = make_starting_population(num_nodes, pop_size)
-    fitnesses = [graph_fitness(starting_pop[1]) for i=1:3000]
-    println("Range: $(maximum(fitnesses) - minimum(fitnesses))")
-    exit()
 
     observe, report = make_observer(max_steps)
     take_step = make_optimizer(graph_fitness, next_graph_generation, max_fitness, starting_pop)
-    cg_fitness = graph_fitness(ones(Int8, num_nodes*(num_nodes-1)÷2))
-    dg_fitness = graph_fitness(zeros(Int8, num_nodes*(num_nodes-1)÷2))
-    println("complete graph fitness: $cg_fitness")
-    println("disconnected graph fitness: $dg_fitness")
+    # cg_fitness = graph_fitness(ones(Int8, num_nodes*(num_nodes-1)÷2))
+    # dg_fitness = graph_fitness(zeros(Int8, num_nodes*(num_nodes-1)÷2))
+    # println("complete graph fitness: $cg_fitness")
+    # println("disconnected graph fitness: $dg_fitness")
 
     progress_bar = ProgressBar(1:max_steps)
     best_graph = missing
@@ -143,10 +140,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     end
 
     max_fitnesses, pop_diversity, avg_fitnesses = report()
-    # println("Max fitnesses")
-    # println(max_fitness)
-    # println("Population Diversity")
-    # println(pop_diversity)
+    println("Max fitnesses")
+    println(max_fitness)
+    println("Population Diversity")
+    println(pop_diversity)
     display(plot(max_fitnesses))
     readline()
     display(plot(avg_fitnesses))
