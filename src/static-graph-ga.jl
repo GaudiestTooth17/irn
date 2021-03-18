@@ -9,6 +9,10 @@ function second(tup)
     tup[2]
 end
 
+function third(tup)
+    tup[3]
+end
+
 @everywhere function genotype_to_adj_matrix(genotype::Vector{Int8})::Matrix{Int8}
     # if calculating num_nodes fails, it is probably because the genotype
     # just doesn't have the right number of entries.
@@ -59,6 +63,27 @@ end
     else
         return length(largest_component) / num_nodes + edge_rating
     end
+end
+
+@everywhere function proposed_fitness(genotype::Vector{Int8})::Float64
+    # This doesn't handle the case where graphs aren't connected and so isn't quite ready for use
+    M = genotype_to_adj_matrix(genotype)
+    N = size(M, 1)
+    max_sim_steps = 1000
+    bad_disease = Dizeez(3, 10, .5)
+    good_disease = Dizeez(3, 10, .5)
+    num_sims = 100
+    
+    results = [x->(calc_remaining_S_nodes(x[1]), length(x[1]), x[2]/N)
+               for x in (simulate_seir_seis(M, make_starting_seir(N, 5),
+                                            make_starting_seis(N, 5),
+                                            bad_disease, good_disease, max_sim_steps)
+                         for i=1:num_sims)]
+
+    ι = sum(first.(results)) / length(results)  # percent of nodes unInfected
+    τ = sum(second.(results)) / length(results) # Time simulation ran
+    γ = sum(third.(results)) / length(results)  # number of Good infections per node
+    ι*(τ + γ)
 end
 
 @everywhere function mutate_genotype!(genotype::Vector{T}, prob::Float64) where T
@@ -112,7 +137,7 @@ function make_starting_population(num_nodes::Int, pop_size::Int)
     pop
 end
 
-if abspath(PROGRAM_FILE) == @__FILE__
+function run_ga()
     max_steps = 500
     num_nodes = 500
     pop_size = 20
@@ -157,4 +182,12 @@ if abspath(PROGRAM_FILE) == @__FILE__
         println("diameter: $(diameter(Graph(M)))")
     end
     write_adj_list("evolved.txt", M)
+end
+
+function rate_graph(M)
+    println(proposed_fitness(adj_matrix_to_genotype(M)))
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    rate_graph(read_adj_list("../graphs/cavemen-50-10.txt"))
 end

@@ -1,5 +1,5 @@
 using LinearAlgebra
-include("sim-datastructures.jl")
+include("lib-sim.jl")
 
 function read_adj_list(file_name)::Matrix{Int}
     file = open(file_name, "r")
