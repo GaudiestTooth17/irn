@@ -29,14 +29,14 @@ function next_seir(old_seir::Matrix{Int}, M::Matrix{T},
     seir[to_e_filter, 1] .= 0
     # Tracking days and seirs
     seir[(seir .> 0)] .+= 1
-    seir[(seir) .< 0] .= 1
+    seir[(seir .< 0)] .= 1
     # This should be faster than checking if the two matrices are equal because of short circuiting
     # and empirically it is faster
     return seir, any(to_r_filter) || any(to_i_filter) || any(to_e_filter)
 end
 
 function next_seis(old_seis::Matrix{Int}, M::Matrix{T},
-    disease::Dizeez) where T
+                   disease::Dizeez) where T
     seis = copy(old_seis)
     N = size(M, 1)
     probs = rand(N)
@@ -59,7 +59,7 @@ function next_seis(old_seis::Matrix{Int}, M::Matrix{T},
     # Tracking days and seis
     seis[(seis .> 0)] .+= 1
     seis[(seis .< 0)] .= 1
-    return seis, length(to_e_filter)
+    return seis, sum(to_e_filter)
 end
 
 function make_starting_seir(num_nodes::Int, num_infected::Int)::Matrix{Int}
