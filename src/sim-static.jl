@@ -82,16 +82,23 @@ if abspath(PROGRAM_FILE) == @__FILE__
     M = read_adj_list("../graphs/spatial-network.txt")
     N = size(M, 1)
     disease = Dizeez(3, 10, .5)
-    max_sim_steps = 50
-    num_sims = 100
+    max_sim_steps = 150
+    num_sims = 1000
     simulation_results = [(calc_remaining_S_nodes(x[1]), x[2])
                           for x in (simulate_seir_seis(M, make_starting_seir(N, 5), make_starting_seis(N, 5),
                                                        disease, disease, max_sim_steps)
                                     for i=1:num_sims)]
-    hist(map(x->x[1], simulation_results), bins=20)
-    title("Remaining Susceptible Agents")
-    figure()
-    title("Good Interactions")
-    hist(map(x->x[2], simulation_results), bins=25)
-    show()
+    remaining_S_nodes = sort(collect(map(x->x[1], simulation_results)))
+    good_interactions = sort(collect(map(x->x[2], simulation_results)))
+    hist(remaining_S_nodes, bins=20)
+    title("Remaining Susceptible Agents (No Quarantine)")
+    # figure()
+    savefig("Remaining Susceptible Agents (No Quarantine)")
+    clf()
+    title("Good Interactions (No Quarantine)")
+    hist(good_interactions, bins=20)
+    # show()
+    savefig("Good Interactions (No Quarantine)")
+    println("Median agents left susceptible: $(remaining_S_nodes[length(remaining_S_nodes) ÷ 2])")
+    println("Median good interactions: $(good_interactions[length(good_interactions) ÷ 2])")
 end

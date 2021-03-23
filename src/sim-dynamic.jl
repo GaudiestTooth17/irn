@@ -61,15 +61,16 @@ if abspath(PROGRAM_FILE) == @__FILE__
     N = size(M, 1)
     disease = Dizeez(3, 10, .5)
     max_sim_steps = 150
-    num_sims = 100
+    num_sims = 1000
     simulation_results = [(calc_remaining_S_nodes(x[1]), x[2])
                           for x in (simulate(M, make_starting_seir(N, 5), make_starting_seis(N, 5),
                                              disease, disease, max_sim_steps)
                                     for i=1:num_sims)]
-    hist(map(x->x[1], simulation_results), bins=20)
+    hist(map(x->x[1], simulation_results), bins=20, color="orange")
     title("Remaining Susceptible Agents")
-    figure()
+    savefig("Remaining Susceptible Agents (Dynamic)")
+    clf()
     title("Good Interactions")
-    hist(map(x->x[2], simulation_results))
-    show()
+    hist(map(x->x[2], simulation_results), bins=20, color="orange")
+    savefig("Good Interactions (Dynamic)")
 end
