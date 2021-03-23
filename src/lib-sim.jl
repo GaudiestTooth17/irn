@@ -6,7 +6,7 @@ end
 
 "Use the disease to make the next SEIR matrix also returns whether or not the old one differs from the new"
 function next_seir(old_seir::Matrix{Int}, M::Matrix{T},
-    disease::Dizeez)::Tuple{Matrix{T}, Bool} where T
+    disease::Dizeez)::Tuple{Matrix{Int}, Bool} where T
     # keep track of whether or not any values were changed from the original matrix
     update_occurred = false
     seir = copy(old_seir)
@@ -32,7 +32,10 @@ function next_seir(old_seir::Matrix{Int}, M::Matrix{T},
     seir[(seir .< 0)] .= 1
     # This should be faster than checking if the two matrices are equal because of short circuiting
     # and empirically it is faster
-    return seir, any(to_r_filter) || any(to_i_filter) || any(to_e_filter)
+    rf = any(to_r_filter)
+    if_ = any(to_i_filter)
+    ef = any(to_e_filter)
+    return seir, rf || if_ || ef
 end
 
 function next_seis(old_seis::Matrix{Int}, M::Matrix{T},

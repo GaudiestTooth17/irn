@@ -1,9 +1,10 @@
 using Plots, ProgressBars, Printf, Distributed
-addprocs(6)
+# addprocs(6)
 @everywhere using LightGraphs, Random, Statistics
 include("ga.jl")
 include("fileio.jl")
-@everywhere include("sim.jl")
+@everywhere include("lib-sim.jl")
+@everywhere include("sim-static.jl")
 
 function second(tup)
     tup[2]
@@ -69,20 +70,23 @@ end
     # This doesn't handle the case where graphs aren't connected and so isn't quite ready for use
     M = genotype_to_adj_matrix(genotype)
     N = size(M, 1)
-    max_sim_steps = 1000
+    max_sim_steps = 75
     bad_disease = Dizeez(3, 10, .5)
     good_disease = Dizeez(3, 10, .5)
-    num_sims = 100
-    
-    results = [x->(calc_remaining_S_nodes(x[1]), length(x[1]), x[2]/N)
-               for x in (simulate_seir_seis(M, make_starting_seir(N, 5),
-                                            make_starting_seis(N, 5),
-                                            bad_disease, good_disease, max_sim_steps)
-                         for i=1:num_sims)]
+    num_sims = 1000
 
-    ι = sum(first.(results)) / length(results)  # percent of nodes unInfected
-    τ = sum(second.(results)) / length(results) # Time simulation ran
-    γ = sum(third.(results)) / length(results)  # number of Good infections per node
+    # results is a list of tuples of the form
+    # (num nodes uninfected, time sim ran, good infections per agent)
+    raw_results = (simulate_seir_seis(M, make_starting_seir(N, 5),
+                                      make_starting_seis(N, 5),
+                                      bad_disease, good_disease, max_sim_steps)
+                   for i=1:num_sims)
+    results = [(calc_remaining_S_nodes(x[1]), length(x[1]), x[2]/N)
+               for x in raw_results]
+
+    ι = sum(map(x->x[1], results)) / length(results)  # percent of nodes unInfected
+    τ = sum(map(x->x[2], results)) / length(results) # Time simulation ran
+    γ = sum(map(x->x[3], results)) / length(results)  # number of Good infections per agent
     ι*(τ + γ)
 end
 
@@ -185,9 +189,18 @@ function run_ga()
 end
 
 function rate_graph(M)
-    println(proposed_fitness(adj_matrix_to_genotype(M)))
+    return proposed_fitness(adj_matrix_to_genotype(M))
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    rate_graph(read_adj_list("../graphs/cavemen-50-10.txt"))
+    # graphs = ("cavemen-50-10", "complete-500", "hex-lattice",
+    #           "line-graph", "spatial-network", "square-lattice",
+    #           "triangle-lattice")
+    graphs = ("hex-lattice", "square-lattice", "triangle-lattice")
+    path_to_graphs = "../graphs/"
+    for network in graphs
+        full_path = "$path_to_graphs$network.txt"
+        rating = rate_graph(read_adj_list(full_path))
+        println("$network: $rating")
+    end
 end
