@@ -70,7 +70,7 @@ end
     # This doesn't handle the case where graphs aren't connected and so isn't quite ready for use
     M = genotype_to_adj_matrix(genotype)
     N = size(M, 1)
-    max_sim_steps = 75
+    max_sim_steps = 50
     bad_disease = Dizeez(3, 10, .5)
     good_disease = Dizeez(3, 10, .5)
     num_sims = 1000
@@ -193,10 +193,9 @@ function rate_graph(M)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    # graphs = ("cavemen-50-10", "complete-500", "hex-lattice",
-    #           "line-graph", "spatial-network", "square-lattice",
-    #           "triangle-lattice")
-    graphs = ("hex-lattice", "square-lattice", "triangle-lattice")
+    graphs = ("cavemen-50-10", "complete-500", "hex-lattice",
+              "line-graph", "spatial-network", "square-lattice",
+              "triangle-lattice", "cgg-520")
     path_to_graphs = "../graphs/"
     for network in graphs
         full_path = "$path_to_graphs$network.txt"
