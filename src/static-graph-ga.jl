@@ -70,7 +70,7 @@ end
     # This doesn't handle the case where graphs aren't connected and so isn't quite ready for use
     M = genotype_to_adj_matrix(genotype)
     N = size(M, 1)
-    max_sim_steps = 50
+    max_sim_steps = 75
     bad_disease = Dizeez(3, 10, .5)
     good_disease = Dizeez(3, 10, .5)
     num_sims = 1000
