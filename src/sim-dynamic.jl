@@ -69,23 +69,33 @@ if abspath(PROGRAM_FILE) == @__FILE__
     disease = Dizeez(3, 10, .5)
     max_sim_steps = 150
     num_sims = 2000
-    for detection_prob in (0.0, .1, .25, .5, .75, .9, 1.0)
+    # for detection_prob in (0.0, .1, .25, .5, .75, .9, 1.0)
+    for detection_prob in (.5, .75, .9)
     # for detection_prob in (1.0, 0.0)
         update_connections = make_behavior_function(detection_prob)
         simulation_results = [(calc_remaining_S_nodes(x[1]), x[2])
                               for x in (simulate(M, make_starting_seir(N, 5), make_starting_seis(N, 5),
                                                  disease, disease, update_connections, max_sim_steps)
                                         for i=ProgressBar(1:num_sims))]
-        fig, (top, bottom) = subplots(2, 1)
-        fig.suptitle("$name\n Detection Prob = $detection_prob Sim Length = $max_sim_steps Num Trials = $num_sims")
-        top.set_xlabel("Remaining Susceptible Agents")
-        top.set_ylabel("Num trials")
-        top.hist(map(x->x[1], simulation_results), bins=20, color="orange")
-        bottom.set_xlabel("Good Interactions")
-        bottom.set_ylabel("Num trials")
-        bottom.hist(map(x->x[2], simulation_results), bins=20, color="orange")
-        tight_layout()
-        subplots_adjust(top=.9)
-        savefig("Results for Detection Probability = $detection_prob on $name.png")
+        # Scatterplot Generation
+        scatter(map(x->x[1], simulation_results), map(x->x[2], simulation_results), s=4.0)
+        title("Infection vs Interaction\nDetection Prob = $detection_prob on $name")
+        xlabel("Susceptible Nodes")
+        ylabel("Good Interactions")
+        savefig("Infection vs Interaction Detection Prob = $detection_prob on $name.png")
+        clf()
+
+        # Histogram Generation
+        # fig, (top, bottom) = subplots(2, 1)
+        # fig.suptitle("$name\n Detection Prob = $detection_prob Sim Length = $max_sim_steps Num Trials = $num_sims")
+        # top.set_xlabel("Remaining Susceptible Agents")
+        # top.set_ylabel("Num trials")
+        # top.hist(map(x->x[1], simulation_results), bins=20, color="orange")
+        # bottom.set_xlabel("Good Interactions")
+        # bottom.set_ylabel("Num trials")
+        # bottom.hist(map(x->x[2], simulation_results), bins=20, color="orange")
+        # tight_layout()
+        # subplots_adjust(top=.9)
+        # savefig("Results for Detection Probability = $detection_prob on $name.png")
     end
 end
