@@ -109,7 +109,7 @@ end
     children = collect(flatten((crossover(parent_pairs[i], parent_pairs[i+1])
                                 for i=1:2:length(parent_pairs))))
     # mutate_genotype!.(children, .000001)
-    mutate_genotype!.(children, .0001)
+    mutate_genotype!.(children, .00001)
     children
 end
 
@@ -135,23 +135,25 @@ function make_starting_population(num_nodes::Int, pop_size::Int)
     # generate values for each of the edges
     # Only generate half-ish of the edges because the matrix is symmetric
     # subtract pop_size from the amount to account for zeros along the diagonal (no self-loops)
-    pop = [adj_matrix_to_genotype(adjacency_matrix(barabasi_albert(num_nodes, 3, 3)))
-           for i=1:pop_size]
+    # pop = [adj_matrix_to_genotype(adjacency_matrix(barabasi_albert(num_nodes, 3, 3)))
+    #        for i=1:pop_size]
+    pop = [adj_matrix_to_genotype(read_adj_list("../graphs/cavemen-10-10.txt")) for i in 1:pop_size]
+    mutate_genotype!.(pop, .001)
     # pop = [Int8.(abs.(rand(Int8, div(num_nodes*(num_nodes+1), 2) - num_nodes)) .% 2)
     #        for i=1:pop_size]
     pop
 end
 
 function run_ga()
-    max_steps = 500
-    num_nodes = 500
-    pop_size = 20
+    max_steps = 100
+    num_nodes = 100
+    pop_size = 40
     max_fitness = 3.0
     starting_pop = make_starting_population(num_nodes, pop_size)
 
     observe, report = make_observer(max_steps)
-    # take_step = make_optimizer(graph_fitness, next_graph_generation, max_fitness, starting_pop)
-    take_step = make_optimizer(proposed_fitness, next_graph_generation, max_fitness, starting_pop)
+    take_step = make_optimizer(graph_fitness, next_graph_generation, max_fitness, starting_pop)
+    # take_step = make_optimizer(proposed_fitness, next_graph_generation, max_fitness, starting_pop)
     # cg_fitness = graph_fitness(ones(Int8, num_nodes*(num_nodes-1)÷2))
     # dg_fitness = graph_fitness(zeros(Int8, num_nodes*(num_nodes-1)÷2))
     # println("complete graph fitness: $cg_fitness")
