@@ -1,3 +1,5 @@
+using Random
+
 struct Dizeez
     days_exposed::Int
     days_infectious::Int
@@ -66,7 +68,7 @@ function next_seis(old_seis::Matrix{Int}, M::Matrix{T},
 end
 
 function make_starting_seir(num_nodes::Int, num_infected::Int)::Matrix{Int}
-    seir = zeros(num_nodes, 4)
+    seir = zeros(Int, num_nodes, 4)
     to_infect = Random.shuffle(1:num_nodes)[1:num_infected]
     seir[:, 1] .= 1
     seir[to_infect, 1] .= 0
@@ -74,9 +76,28 @@ function make_starting_seir(num_nodes::Int, num_infected::Int)::Matrix{Int}
     seir
 end
 
-function make_starting_seis(num_nodes::Int, num_infected)::Matrix{Int}
-    seis = zeros(num_nodes, 3)
+function make_fixed_starting_seir(num_nodes::Int, num_infected::Int)::Matrix{Int}
+    seir = zeros(Int, num_nodes, 4)
+    to_infect = 1:num_infected
+    seir[:, 1] .= 1
+    seir[to_infect, 1] .= 0
+    seir[to_infect, 3] .= 1
+    seir
+end
+
+function make_starting_seis(num_nodes::Int, num_infected::Int)::Matrix{Int}
+    seis = zeros(Int, num_nodes, 3)
     to_infect = Random.shuffle(1:num_nodes)[1:num_infected]
+    seis[:, 1] .= 1
+    seis[to_infect, 1] .= 0
+    seis[to_infect, 3] .= 1
+    seis
+end
+
+function make_fixed_starting_seis(num_nodes::Int, num_infected::Int)::Matrix{Int}
+    seis = zeros(Int, num_nodes, 3)
+    # infect the last few nodes so as not to overlap with the nodes infected in the fixed seir
+    to_infect = num_nodes-num_infected:num_nodes
     seis[:, 1] .= 1
     seis[to_infect, 1] .= 0
     seis[to_infect, 3] .= 1

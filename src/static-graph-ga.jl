@@ -5,6 +5,7 @@ include("ga.jl")
 include("fileio.jl")
 @everywhere include("lib-sim.jl")
 @everywhere include("sim-static.jl")
+@everywhere include("net-encode-lib.jl")
 
 function second(tup)
     tup[2]
@@ -14,41 +15,10 @@ function third(tup)
     tup[3]
 end
 
-@everywhere function genotype_to_adj_matrix(genotype::Vector{Int8})::Matrix{Int8}
-    # if calculating num_nodes fails, it is probably because the genotype
-    # just doesn't have the right number of entries.
-    # This is basically the inverse of the triangular sum.
-    num_nodes = Int(sqrt(2*length(genotype)+.25) + .5)
-    adj_matrix = zeros(Int8, num_nodes, num_nodes)
-    current_edge = 1
-    for i = 1:size(adj_matrix, 1)
-        for j = i+1:size(adj_matrix, 2)
-            adj_matrix[i, j] = genotype[current_edge]
-            adj_matrix[j, i] = genotype[current_edge]
-            current_edge += 1
-        end
-    end
-    adj_matrix
-end
-
-function adj_matrix_to_genotype(M::AbstractMatrix)::Vector{Int8}
-    num_nodes = size(M, 1)
-    # genotype contains an entry for every edge on the graph
-    genotype = zeros(Int8, (num_nodes*(num_nodes-1) ÷ 2))
-    current_loc = 1
-    for i = 1:size(M, 1)
-        for j = i+1:size(M, 2)
-            genotype[current_loc] = M[i, j]
-            current_loc += 1
-        end
-    end
-    genotype
-end
-
 @everywhere function graph_fitness(genotype::Vector{Int8})::Float64
     # Graphs are rated on 3 different categories that each have a max of 1.0
     edge_rating = (length(genotype) - sum(genotype)) / length(genotype)
-    M = genotype_to_adj_matrix(genotype)
+    M = encoding_to_adj_matrix(genotype)
     G = Graph(M)
     components = connected_components(G)
     largest_component = maximum(length, components)
@@ -68,7 +38,7 @@ end
 
 @everywhere function proposed_fitness(genotype::Vector{Int8})::Float64
     # This doesn't handle the case where graphs aren't connected and so isn't quite ready for use
-    M = genotype_to_adj_matrix(genotype)
+    M = encoding_to_adj_matrix(genotype)
     N = size(M, 1)
     max_sim_steps = 75
     bad_disease = Dizeez(3, 10, .5)
@@ -137,7 +107,7 @@ function make_starting_population(num_nodes::Int, pop_size::Int)
     # subtract pop_size from the amount to account for zeros along the diagonal (no self-loops)
     # pop = [adj_matrix_to_genotype(adjacency_matrix(barabasi_albert(num_nodes, 3, 3)))
     #        for i=1:pop_size]
-    pop = [adj_matrix_to_genotype(read_adj_list("../graphs/cavemen-10-10.txt")) for i in 1:pop_size]
+    pop = [adj_matrix_to_encoding(read_adj_list("../graphs/cavemen-10-10.txt")) for i in 1:pop_size]
     mutate_genotype!.(pop, .001)
     # pop = [Int8.(abs.(rand(Int8, div(num_nodes*(num_nodes+1), 2) - num_nodes)) .% 2)
     #        for i=1:pop_size]
@@ -186,7 +156,7 @@ function run_ga()
     title("Diversity")
     PyPlot.plot(pop_diversity)
     PyPlot.show()
-    M = genotype_to_adj_matrix(best_graph)
+    M = encoding_to_adj_matrix(best_graph)
     num_compenents = length(connected_components(Graph(M)))
     println("num components: $num_compenents")
     if num_compenents == 1
@@ -196,7 +166,7 @@ function run_ga()
 end
 
 function rate_graph(M)
-    return proposed_fitness(adj_matrix_to_genotype(M))
+    return proposed_fitness(adj_matrix_to_encoding(M))
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
