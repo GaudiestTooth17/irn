@@ -69,12 +69,13 @@ end
 function run_sim_batch(adj_matrix::Matrix{T}, starting_seir::Matrix{Int},
     disease::Dizeez, max_steps::Int, num_sims::Int)::Vector{Int} where T
 
-    # vector_of_remaining_S_nodes = map(i->calc_remaining_S_nodes(
-    #     simulate(adj_matrix, starting_seir, disease, max_steps)),
-    #     1:num_sims)
-    sim_lengths = [length(simulate(adj_matrix, starting_seir, disease, max_steps))
-                   for i=1:num_sims]
-    sim_lengths
+    vector_of_remaining_S_nodes = map(i->calc_remaining_S_nodes(
+        simulate(adj_matrix, starting_seir, disease, max_steps)),
+        1:num_sims)
+    vector_of_remaining_S_nodes
+    # sim_lengths = [length(simulate(adj_matrix, starting_seir, disease, max_steps))
+    #                for i=1:num_sims]
+    # sim_lengths
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

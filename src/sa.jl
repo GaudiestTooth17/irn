@@ -34,8 +34,9 @@ function P(energy, energy′, T)::Float64
         1.0
     else
         exp(-(energy′-energy)/T)
+        # 0.0
     end
-    
+
     acceptance_prob
 end
 
@@ -58,10 +59,10 @@ end
 Make a temperature schedule that decreases linearly. The first temperature returned is
 T₀. Each subsequent temperature is δT less than the last. The minimum temperature is 0.
 """
-function make_linear_schedule(T₀::Float64, δT::Float64)::Function
-    T = T₀ + δT
+function make_linear_schedule(T₀::Float64, ΔT::Float64)::Function
+    T = T₀ + ΔT
     function schedule()::Float64
-        T -= δT
+        T -= ΔT
         max(0.0, T)
     end
     schedule
