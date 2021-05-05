@@ -34,7 +34,6 @@ function P(energy, energy′, T)::Float64
         1.0
     else
         exp(-(energy′-energy)/T)
-        # 0.0
     end
 
     acceptance_prob

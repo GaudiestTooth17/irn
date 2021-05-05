@@ -1,4 +1,10 @@
-using ProgressBars, LightGraphs, Statistics
+"""
+An encoding is an array of Int8's specifying whether or not an edge exists. (1 true, 0 false)
+ϵ is used for encodings.
+"""
+
+
+using ProgressBars, LightGraphs, Statistics, Random
 
 include("sa.jl")
 include("fileio.jl")
@@ -25,9 +31,19 @@ function network_neighbor(ϵ::Encoding)::Encoding
 end
 
 function farther_network_neighbor(ϵ::Encoding)::Encoding
-    edges = [rand(1:length(ϵ)) for i=1:rand(1:100)]
+    # edges = [rand(1:length(ϵ)) for i=1:rand(1:100)]
+    edges = [rand(1:length(ϵ)) for i=1:5]
     neighbor = copy(ϵ)
     neighbor[edges] .= 1 .- neighbor[edges]
+    neighbor
+end
+
+function perm_network_neighbor(ϵ::Encoding)::Encoding
+    edge_index = rand(findall(!iszero, ϵ))
+    no_edge_index = rand(findall(iszero, ϵ))
+    neighbor = copy(ϵ)
+    neighbor[edge_index] = 0
+    neighbor[no_edge_index] = 1
     neighbor
 end
 
@@ -90,29 +106,80 @@ function make_no_spread_objective()
     objective
 end
 
+"""
+The percolation objective removes ϕ*100 percent of the edges in a network and then
+assigns an energy based off of the size of the largest component
+and the total number of components.
+"""
+seen = 0
+function make_percolation_objective(ϕ::Float64)::Function
+    rated_networks = Dict{Encoding, Float64}()
+    function objective(ϵ::Encoding)
+        if ϵ in keys(rated_networks)
+            # println("already calculated: $(rated_networks[ϵ])")
+            return rated_networks[ϵ]
+        end
+
+        M = encoding_to_adj_matrix(ϵ)
+        G = Graph(M)
+        N = size(M, 1)
+        if !is_connected(G)
+            return 2*N
+        end
+
+        num_trials = 101
+        energy = 0.0
+        for i = 1:num_trials
+            G_temp = copy(G)
+            # remove edges
+            shuffled_edges = shuffle(collect(edges(G_temp)))
+            num_to_remove = Int(floor(length(shuffled_edges)*ϕ))
+            for edge in shuffled_edges[1:num_to_remove]
+                rem_edge!(G_temp, edge)
+            end
+            # calculate energy
+            comps = connected_components(G_temp)
+            biggest_comp_size = maximum(length, comps)
+            energy += (N - length(comps) + biggest_comp_size)
+            # energy += N - length(comps)
+            # energy += biggest_comp_size
+            # println("num components: $(length(comps)) biggest's size: $(length(biggest_comp))")
+        end
+        energy /= num_trials
+        rated_networks[ϵ] = energy
+        # println(energy)
+        energy
+    end
+    objective
+end
+
 function find_resilient_network(max_steps=500, T₀=100.0)
-    Random.seed!(42)
+    # Random.seed!(42)
     start_time = Dates.now()
     println("Beginning.")
     # number of nodes
     N = 100
     # initial encoding
     # ϵ₀ = rand((Int8(0), Int8(1)), N*(N-1)÷2)
-    ϵ₀ = adj_matrix_to_encoding(read_adj_list("../graphs/cavemen-10-10.txt"))
+    # ϵ₀ = adj_matrix_to_encoding(read_adj_list("../graphs/cavemen-10-10.txt"))
+    # E is the number of edges we want
+    E = Int(floor(N*(N-1)÷2 * .05))
+    ϵ₀ = shuffle(Int8.([if i <= E 1 else 0 end for i=1:N*(N-1)÷2]))
     # initial temperature is T₀
     # resilient_objective = make_resilient_objective()
-    no_spread_obj = make_no_spread_objective()
+    # no_spread_obj = make_no_spread_objective()
+    perc_obj = make_percolation_objective(.75)
 
-    optimizer_step = make_sa_optimizer(no_spread_obj,
-        # make_linear_schedule(T₀, T₀/150),
-        make_fast_schedule(T₀),
-        farther_network_neighbor, ϵ₀)
+    optimizer_step = make_sa_optimizer(perc_obj,
+        make_linear_schedule(T₀, T₀/(max_steps/4)),
+        # make_fast_schedule(T₀),
+        perm_network_neighbor, ϵ₀)
 
     best_ϵ = missing
     energies = zeros(max_steps)
     pbar = ProgressBar(1:max_steps)
-    for step in pbar
-    # for step = 1:max_steps
+    # for step in pbar
+    for step = 1:max_steps
         best_ϵ, energy = optimizer_step()
         energies[step] = energy
     end
