@@ -6,8 +6,7 @@ include("fileio.jl")
 detection_prob is the probability every step of an infectious person being discovered."
 function make_behavior_function(detection_prob::Float64)::Function
     function update_connections(D::Matrix{T}, M::Matrix{T}, seir::Matrix{Int}, seis::Matrix{Int}) where T Matrix{T}
-        N = size(M, 1)
-        probs = rand(Float64, N)
+        probs = rand(Float64, size(M, 1))
         i_agents = (seir[:, 3] .> 0) .& (probs .< detection_prob)
         r_agents = seir[:, 4] .> 0
     
@@ -23,6 +22,34 @@ function make_behavior_function(detection_prob::Float64)::Function
     update_connections
 end
 
+"""
+If an agent detects that a neighbor is infectious, it will disconnect from it with a probability
+that is positively correlated with its own degree.
+"""
+function make_degree_behavior_function(detection_prob::Float64)::Function
+    # TODO: incorporate willingness_to_disconnect in deciding whether to disconnect
+    function update_connections(D::Matrix, M::Matrix, seir::Matrix{Int}, seis::Matrix{Int})::Matrix
+        N = size(M, 1)
+        # calculate the degree of each agent
+        degrees = sum(D, dims=1)
+        max_deg = maximum(degrees)
+        observation_power = rand(Float64, N)
+        # an agent's willingness to connect increases as their degree increases
+        willingness_to_disconnect = [1/(max_deg-deg+1) for deg in degrees]
+        i_agents = (seir[:, 3] .> 0) .& (observation_power .< detection_prob)
+        r_agents = seir[:, 4] .> 0
+    
+        new_D = copy(D)
+        # remove connections to infectious agents
+        new_D[i_agents, :] .= 0
+        new_D[:, i_agents] .= 0
+        # recovered agents restore their old connections
+        new_D[r_agents, :] = M[r_agents, :]
+        new_D[:, r_agents] = M[:, r_agents]
+        new_D
+    end
+end
+
 "This simulates both a SEIR and SEIS disease. M acts as the base matrix which remains unchanged, but the infection
 happens on a dynamically changing matrix that has a subset of the edges M has."
 function simulate(M::Matrix{T}, starting_seir::Matrix{Int}, starting_seis::Matrix{Int},
@@ -33,7 +60,7 @@ function simulate(M::Matrix{T}, starting_seir::Matrix{Int}, starting_seis::Matri
     seiss = Vector{Matrix{Int}}(undef, max_steps)
     seiss[1] = copy(starting_seis)
     seis_nodes_infected = sum(starting_seis[3, :])
-    D = copy(M)  # D is the dynamic graph
+    D = copy(M)  # D is the dynamic adjacency matrix
     N = size(M, 1)
 
     for step = 2:max_steps

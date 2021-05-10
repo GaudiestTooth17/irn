@@ -25,7 +25,8 @@ function simulate_static(M::Matrix, β::Float64, τ::Int,
     percolated_M = encoding_to_adj_matrix(percolated_ϵ)
 
     # identify infected agents
-    infectious_agents = Set(randperm(1:N)[1:num_infectious])
+    N = size(M, 1)
+    infectious_agents = Set(randperm(N)[1:num_infectious])
     components = connected_components(Graph(percolated_M))
     infected_components = Set(component for component in components
                                         for agent in component
