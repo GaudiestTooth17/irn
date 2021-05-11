@@ -43,7 +43,7 @@ M is an unweighted adjacency matrix.
 percent_infectious gives the percentage of agents infectious at the start of the simulation
 Returns the number of agents who caught the infection
 """
-function simulate_static(M::Matrix, β::Float64, τ::Float64, percent_infectious::Float64)::Int
+function simulate_static(M::Matrix, β::Float64, τ::Int, percent_infectious::Float64)::Int
     num_infectious = Int(round(percent_infectious * size(M, 1)))
     simulate_static(M, β, τ, num_infectious)
 end

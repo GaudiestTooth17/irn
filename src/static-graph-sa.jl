@@ -4,13 +4,13 @@ An encoding is an array of Int8's specifying whether or not an edge exists. (1 t
 """
 
 
-using ProgressBars, LightGraphs, Statistics, Random
+using ProgressBars, LightGraphs, Statistics, Random, Printf
 
 include("sa.jl")
 include("fileio.jl")
 include("net-encode-lib.jl")
 include("lib-sim.jl")
-include("sim-static.jl")
+include("percolation-sim.jl")
 
 Encoding = Vector{Int8}
 
@@ -21,6 +21,25 @@ function sparse_graph_objective(ϵ)
     else
         sum(ϵ)
     end
+end
+
+function make_neighbor_explorer()::Function
+    encoding_to_tried_edges = Dict{Encoding, Set{Int}}()
+    function network_neighbor(ϵ::Encoding)::Encoding
+        if !(ϵ in keys(encoding_to_tried_edges))
+            encoding_to_tried_edges[ϵ] = Set{Int}()
+        end
+        edge = rand(1:length(ϵ))
+        # FIXME: This got stuck once because all the edges had been tried.
+        while edge in encoding_to_tried_edges[ϵ]
+            edge = rand(1:length(ϵ))
+        end
+        push!(encoding_to_tried_edges[ϵ], edge)
+        neighbor = copy(ϵ)
+        neighbor[edge] = 1 - neighbor[edge]
+        neighbor
+    end
+    network_neighbor
 end
 
 function network_neighbor(ϵ::Encoding)::Encoding
@@ -57,24 +76,22 @@ function make_resilient_objective()
         end
 
         # Graphs are rated on 3 different categories that each have a max of 1.0
-        edge_rating = -(sum(encoding) / length(encoding))*10
-        # return -edge_rating
-        # edge_rating = 0.0
         M = encoding_to_adj_matrix(encoding)
         G = Graph(M)
         components = connected_components(G)
         largest_component = maximum(length, components)
-        num_nodes = length(vertices(G))
-        max_sim_steps = 300
-        num_sims = 300
-        max_edges = num_nodes * (num_nodes - 1) ÷ 2
+        N = length(vertices(G))
+        num_sims = 500
+
+        max_edges = N * (N - 1) ÷ 2
+        E = length(edges(G))
+        edge_rating = (E/max_edges) * N
+
         rating = if is_connected(G)
-            disease = Dizeez(3, 10, .25)
-            sim_lens = run_sim_batch(M, make_fixed_starting_seir(num_nodes, 1),
-                                    disease, max_sim_steps, num_sims)
-            -(1 + median(sim_lens) / max_sim_steps + edge_rating)
+            num_infected = [simulate_static(M, .1, 5, .01) for i=1:num_sims]
+            sum(num_infected) / num_sims + edge_rating
         else
-            -(length(largest_component) / num_nodes + edge_rating)
+            2*N - length(largest_component) + edge_rating
         end
         rated_networks[encoding] = rating
         rating
@@ -106,53 +123,6 @@ function make_no_spread_objective()
     objective
 end
 
-"""
-The percolation objective removes ϕ*100 percent of the edges in a network and then
-assigns an energy based off of the size of the largest component
-and the total number of components.
-"""
-seen = 0
-function make_percolation_objective(ϕ::Float64)::Function
-    rated_networks = Dict{Encoding, Float64}()
-    function objective(ϵ::Encoding)
-        if ϵ in keys(rated_networks)
-            # println("already calculated: $(rated_networks[ϵ])")
-            return rated_networks[ϵ]
-        end
-
-        M = encoding_to_adj_matrix(ϵ)
-        G = Graph(M)
-        N = size(M, 1)
-        if !is_connected(G)
-            return 2*N
-        end
-
-        num_trials = 101
-        energy = 0.0
-        for i = 1:num_trials
-            G_temp = copy(G)
-            # remove edges
-            shuffled_edges = shuffle(collect(edges(G_temp)))
-            num_to_remove = Int(floor(length(shuffled_edges)*ϕ))
-            for edge in shuffled_edges[1:num_to_remove]
-                rem_edge!(G_temp, edge)
-            end
-            # calculate energy
-            comps = connected_components(G_temp)
-            biggest_comp_size = maximum(length, comps)
-            energy += (N - length(comps) + biggest_comp_size)
-            # energy += N - length(comps)
-            # energy += biggest_comp_size
-            # println("num components: $(length(comps)) biggest's size: $(length(biggest_comp))")
-        end
-        energy /= num_trials
-        rated_networks[ϵ] = energy
-        # println(energy)
-        energy
-    end
-    objective
-end
-
 function find_resilient_network(max_steps=500, T₀=100.0)
     # Random.seed!(42)
     start_time = Dates.now()
@@ -163,25 +133,26 @@ function find_resilient_network(max_steps=500, T₀=100.0)
     # ϵ₀ = rand((Int8(0), Int8(1)), N*(N-1)÷2)
     # ϵ₀ = adj_matrix_to_encoding(read_adj_list("../graphs/cavemen-10-10.txt"))
     # E is the number of edges we want
-    E = Int(floor(N*(N-1)÷2 * .05))
+    E = Int(floor(N*(N-1)÷2 * .03))
     ϵ₀ = shuffle(Int8.([if i <= E 1 else 0 end for i=1:N*(N-1)÷2]))
     # initial temperature is T₀
-    # resilient_objective = make_resilient_objective()
-    # no_spread_obj = make_no_spread_objective()
-    perc_obj = make_percolation_objective(.75)
+    objective = make_resilient_objective()
 
-    optimizer_step = make_sa_optimizer(perc_obj,
-        make_linear_schedule(T₀, T₀/(max_steps/4)),
-        # make_fast_schedule(T₀),
-        perm_network_neighbor, ϵ₀)
+    optimizer_step = make_sa_optimizer(objective,
+        # make_linear_schedule(T₀, T₀/(max_steps/4)),
+        make_fast_schedule(T₀),
+        # perm_network_neighbor,
+        make_neighbor_explorer(),
+        ϵ₀)
 
     best_ϵ = missing
     energies = zeros(max_steps)
     pbar = ProgressBar(1:max_steps)
-    # for step in pbar
-    for step = 1:max_steps
+    for step in pbar
+    # for step = 1:max_steps
         best_ϵ, energy = optimizer_step()
         energies[step] = energy
+        set_description(pbar, string(@sprintf("Energy: %.2f", energy)))
     end
     println("Done. ($(Dates.now()-start_time))")
     PyPlot.plot(energies)
@@ -214,4 +185,10 @@ function find_sparse_connected_graph(max_steps=500, T₀=100.0)
     PyPlot.plot(energies)
     PyPlot.show()
     best_ϵ
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    ϵ = find_resilient_network(15_000, 50.0)
+    M = encoding_to_adj_matrix(ϵ)
+    write_adj_list("annealed.txt", M)
 end
