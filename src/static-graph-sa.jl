@@ -28,9 +28,11 @@ function make_neighbor_explorer()::Function
     function network_neighbor(ϵ::Encoding)::Encoding
         if !(ϵ in keys(encoding_to_tried_edges))
             encoding_to_tried_edges[ϵ] = Set{Int}()
+        # if all of the edges have already been tried, just return the original encoding
+        elseif length(encoding_to_tried_edges[ϵ]) == length(ϵ)
+            return ϵ
         end
         edge = rand(1:length(ϵ))
-        # FIXME: This got stuck once because all the edges had been tried.
         while edge in encoding_to_tried_edges[ϵ]
             edge = rand(1:length(ϵ))
         end
@@ -85,7 +87,7 @@ function make_resilient_objective()
 
         max_edges = N * (N - 1) ÷ 2
         E = length(edges(G))
-        edge_rating = (E/max_edges) * N
+        edge_rating = N - (E/max_edges) * N
 
         rating = if is_connected(G)
             num_infected = [simulate_static(M, .1, 5, .01) for i=1:num_sims]
@@ -131,10 +133,10 @@ function find_resilient_network(max_steps=500, T₀=100.0)
     N = 100
     # initial encoding
     # ϵ₀ = rand((Int8(0), Int8(1)), N*(N-1)÷2)
-    # ϵ₀ = adj_matrix_to_encoding(read_adj_list("../graphs/cavemen-10-10.txt"))
+    ϵ₀ = adj_matrix_to_encoding(read_adj_list("../graphs/cavemen-10-10.txt"))
     # E is the number of edges we want
-    E = Int(floor(N*(N-1)÷2 * .03))
-    ϵ₀ = shuffle(Int8.([if i <= E 1 else 0 end for i=1:N*(N-1)÷2]))
+    # E = Int(floor(N*(N-1)÷2 * .03))
+    # ϵ₀ = shuffle(Int8.([if i <= E 1 else 0 end for i=1:N*(N-1)÷2]))
     # initial temperature is T₀
     objective = make_resilient_objective()
 
