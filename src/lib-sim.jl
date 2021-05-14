@@ -6,11 +6,13 @@ struct Dizeez
     transmission_prob::Float64
 end
 
-"Use the disease to make the next SEIR matrix also returns whether or not the old one differs from the new"
+"""
+Use the disease to make the next SEIR matrix also returns whether or not the old one differs from the new
+The first dimension of seir is node. The second dimension is state.
+"""
 function next_seir(old_seir::Matrix{Int}, M::Matrix{T},
     disease::Dizeez)::Tuple{Matrix{Int}, Bool} where T
     # keep track of whether or not any values were changed from the original matrix
-    update_occurred = false
     seir = copy(old_seir)
     N = size(M, 1)
     probs = rand(N)
