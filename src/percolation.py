@@ -13,8 +13,9 @@ Layout = Dict[int, Tuple[float, float]]
 def main():
     num_trials = 5000
     phi = .75
-    name = 'Erdos-Renyi 500-.01'
-    G = nx.fast_gnp_random_graph(500, .01)
+    M, _ = read_file('../graphs/elitist (500, 500).txt')
+    name = 'Elitist (500, 500)'
+    G = nx.Graph(M)
     results = [analyze_percolation(percolate(G, phi)) for _ in tqdm(range(num_trials))]
     num_components, size_largest_components = zip(*results)
     plt.title(f'{name} Number of Components')
@@ -72,7 +73,7 @@ def read_file(fileName) -> Tuple[np.ndarray, Optional[Layout]]:
             i += 1
 
         rest_of_lines = tuple(map(lambda s: s.split(),
-                              filter(lambda s: len(s) > 1, f.readlines())))
+                                  filter(lambda s: len(s) > 1, f.readlines())))
         layout = {int(line[0]): (float(line[1]), float(line[2]))
                   for line in rest_of_lines} if len(rest_of_lines) > 0 else None
     return matrix, layout
