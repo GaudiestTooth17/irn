@@ -110,3 +110,7 @@ function calc_remaining_S_nodes(seirs::Vector{Matrix{Int}})::Int
     final_seir = seirs[end]
     sum(final_seir[:, 1] .> 0)
 end
+
+function average(xs::Vector)::Float64
+    sum(xs) / length(xs)
+end
