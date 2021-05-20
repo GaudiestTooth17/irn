@@ -1,5 +1,6 @@
 """
-There is something wrong with the algorithm. Review the NetworkX code.
+This is a translation of the algorithm for calculating edge betweeness centrality
+that NetworkX uses.
 """
 
 using LightGraphs, DataStructures
