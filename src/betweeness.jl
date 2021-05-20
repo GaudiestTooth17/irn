@@ -60,8 +60,8 @@ end
 
 function _accumulate_edges(betweeness, S, P, σ, s)
     δ = Dict(s => 0.0 for s ∈ S)
-    while length(S) > 0
-        w = pop!(S)
+    for i=length(S):-1:1
+        w = S[i]
         coeff = (1 + δ[w]) / σ[w]
         for v ∈ P[w]
             c = σ[v] * coeff
@@ -105,11 +105,10 @@ function _rescale_e(betweeness, n, normalized::Bool, directed::Bool, k=nothing)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    # G = cycle_graph(10)
-    G = complete_graph(10)
+    G = cycle_graph(10)
+    # G = complete_graph(10)
     betweeness = edge_betweeness(G)
     for (k, v) ∈ betweeness
         println("$k: $v")
     end
-    println(sum(values(betweeness)))
 end
