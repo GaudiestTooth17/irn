@@ -5,9 +5,11 @@ include("fileio.jl")
 SEIR = Matrix{Int}
 SEIRS = Vector{SEIR}
 
-"Creates a function to use in simulate that updates the connections on the graph.
-detection_prob is the probability every step of an infectious person being discovered."
-function make_behavior_function(detection_prob::Float64)::Function
+"""
+Creates a function to use in simulate that updates the connections on the graph.
+detection_prob is the probability every step of an infectious person being discovered.
+"""
+function make_behavior_function_dual(detection_prob::Float64)::Function
     function update_connections(D::Matrix{T}, M::Matrix{T}, seir::Matrix{Int}, seis::Matrix{Int}) where T Matrix{T}
         probs = rand(Float64, size(M, 1))
         i_agents = (seir[:, 3] .> 0) .& (probs .< detection_prob)
@@ -15,6 +17,28 @@ function make_behavior_function(detection_prob::Float64)::Function
     
         new_D = copy(D)
         # remove connections to infectious agents
+        new_D[i_agents, :] .= 0
+        new_D[:, i_agents] .= 0
+        # recovered agents restore their old connections
+        new_D[r_agents, :] = M[r_agents, :]
+        new_D[:, r_agents] = M[:, r_agents]
+        new_D
+    end
+    update_connections
+end
+
+"""
+Creates a function to use in simulate that updates the connections on the graph.
+detection_prob is the probability every step of an infectious person being discovered.
+"""
+function make_detection_behavior(detection_prob::Float64)::Function
+    function update_connections(D::Matrix, M::Matrix, seir::Matrix)::Matrix
+        probs = rand(Float64, size(M, 1))
+        i_agents = (seir[:, 3] .> 0) .& (probs .< detection_prob)
+        r_agents = seir[:, 4] .> 0
+
+        new_D = copy(D)
+        #remove connections to infectious agents
         new_D[i_agents, :] .= 0
         new_D[:, i_agents] .= 0
         # recovered agents restore their old connections
@@ -93,7 +117,8 @@ function simulate(M::Matrix{T}, seir₀::SEIR, disease::Dizeez,
         # Get the adjacency matrix to use at this step
         D = update_connections(D, M, seirs[step-1])
         # update the statistic about the number of edges in D
-        edges_present[step] = sum(M) ÷ 2
+        edges_present[step] = sum(D) ÷ 2
+        # println("step $step num_edges $(edges_present[step])")
 
         # next seir is the workhorse of the simulation because it is responsible
         # for simulating the disease spread
@@ -112,11 +137,10 @@ function simulate(M::Matrix{T}, seir₀::SEIR, disease::Dizeez,
         if !states_changed && disease_gone
             for i=step:max_steps
                 seirs[i] = copy(seirs[step])
-                # TODO: This probably isn't a good way to decide how many edges are active
-                # because if the disease is gone, more social interaction should be happening.
-                # Taking the extreme approach of activating all edges probably isn't a good idea
-                # either because that would just encourage a short complete quarantine.
-                edges_present[i] = edges_present[step]
+                # TODO: This may not be the best way to auto-populate edges_present
+                # Change this to not add anything extra to edges_present. Just return
+                # the current numbers without extrapolating into the future.
+                edges_present[i] = edges_present[1]
             end
             return seirs, edges_present
         end
@@ -133,7 +157,6 @@ function make_degree_behavior_function(M::Matrix)::Function
     max_M_deg = maximum(sum(M, dims=1))
     degrees = sum(M, dims=1)
     willingness_to_disconnect = [deg/max_M_deg for deg in degrees]
-    # TODO: incorporate willingness_to_disconnect in deciding whether to disconnect
     function update_connections(D::Matrix, M::Matrix, seir::Matrix{Int})::Matrix
         new_D = copy(M)
         N = size(M, 1)
@@ -168,7 +191,7 @@ function run_dual_sims()
     # for detection_prob in (0.0, .1, .25, .5, .75, .9, 1.0)
     for detection_prob in (.5, .75, .9)
     # for detection_prob in (1.0, 0.0)
-        update_connections = make_behavior_function(detection_prob)
+        update_connections = make_behavior_function_dual(detection_prob)
         simulation_results = [(calc_remaining_S_nodes(x[1]), x[2])
                               for x in (dual_simulate(M, make_starting_seir(N, 5), make_starting_seis(N, 5),
                                                       disease, disease, update_connections, max_sim_steps)
@@ -197,24 +220,27 @@ function run_dual_sims()
 end
 
 function run_sims()
-    name = "elitist (500, 500)"
+    name = "cavemen-50-10"
     M = read_adj_list("../graphs/$name.txt")
     N = size(M, 1)
     disease = Dizeez(3, 10, .5)
-    max_sim_steps = 200
+    max_sim_steps = 150
     num_sims = 2000
 
+    # for detection_prob in (.5, .75, .9)
     update_connections = make_degree_behavior_function(M)
+    # update_connections = make_detection_behavior(detection_prob)
     simulation_results = [(calc_remaining_S_nodes(x[1]), average(x[2])/N)
-                          for x in (simulate(M, make_starting_seir(N, 5), disease,
-                                             update_connections, max_sim_steps)
-                                    for i=ProgressBar(1:num_sims))]
+                            for x in (simulate(M, make_starting_seir(N, 5), disease,
+                                                update_connections, max_sim_steps)
+                                        for _=ProgressBar(1:num_sims))]
     scatter(map(x->x[1], simulation_results), map(x->x[2], simulation_results), s=4.0)
-    title("$name\nInfection vs Interaction")
+    title("$name\nInfection vs Interaction\nShunning Behavior")
     xlabel("Susceptible Nodes at End of Simulation")
     ylabel("Average Number of Edges per Agent")
-    savefig("$name Infection vs Interaction.png")
+    savefig("$name Infection vs Interaction Shunning Behavior.png")
     clf()
+    # end
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
