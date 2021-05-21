@@ -11,8 +11,7 @@ include("fileio.jl")
 include("net-encode-lib.jl")
 include("lib-sim.jl")
 include("percolation-sim.jl")
-
-Encoding = Vector{Int8}
+include("betweeness.jl")
 
 function sparse_graph_objective(ϵ)
     G = Graph(encoding_to_adj_matrix(ϵ))
@@ -125,12 +124,32 @@ function make_no_spread_objective()
     objective
 end
 
+function make_high_betweeness_objective()
+    rated_networks = Dict{Encoding, Float64}()
+    function objective(ϵ::Encoding)
+        if haskey(rated_networks, ϵ)
+            return rated_networks[ϵ]
+        end
+
+        G = Graph(encoding_to_adj_matrix(ϵ))
+        if !is_connected(G)
+            rated_networks[ϵ] = .1
+            return rated_networks[ϵ]
+        end
+        edge_betweenesses = collect(values(edge_betweeness(G)))
+        sort!(edge_betweenesses, rev=true)
+        rated_networks[ϵ] = -sum(edge_betweenesses[1:2]) - diameter(G)*.1
+        rated_networks[ϵ]
+    end
+    objective
+end
+
 function find_resilient_network(max_steps=500, T₀=100.0)
     # Random.seed!(42)
     start_time = Dates.now()
     println("Beginning.")
     # number of nodes
-    N = 100
+    # N = 100
     # initial encoding
     # ϵ₀ = rand((Int8(0), Int8(1)), N*(N-1)÷2)
     ϵ₀ = adj_matrix_to_encoding(read_adj_list("../graphs/cavemen-10-10.txt"))
@@ -138,7 +157,8 @@ function find_resilient_network(max_steps=500, T₀=100.0)
     # E = Int(floor(N*(N-1)÷2 * .03))
     # ϵ₀ = shuffle(Int8.([if i <= E 1 else 0 end for i=1:N*(N-1)÷2]))
     # initial temperature is T₀
-    objective = make_resilient_objective()
+    # objective = make_resilient_objective()
+    objective = make_high_betweeness_objective()
 
     optimizer_step = make_sa_optimizer(objective,
         # make_linear_schedule(T₀, T₀/(max_steps/4)),
@@ -190,7 +210,7 @@ function find_sparse_connected_graph(max_steps=500, T₀=100.0)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
-    ϵ = find_resilient_network(15_000, 50.0)
+    ϵ = find_resilient_network(2500, 100.0)
     M = encoding_to_adj_matrix(ϵ)
     write_adj_list("annealed.txt", M)
 end
