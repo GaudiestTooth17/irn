@@ -1,6 +1,7 @@
 using Random
 using LightGraphs
 import Base.Iterators: flatten
+import PyPlot
 include("net-encode-lib.jl")
 
 """
@@ -46,4 +47,20 @@ Returns the number of agents who caught the infection
 function simulate_static(M::Matrix, β::Float64, τ::Int, percent_infectious::Float64)::Int
     num_infectious = Int(round(percent_infectious * size(M, 1)))
     simulate_static(M, β, τ, num_infectious)
+end
+
+if abspath(PROGRAM_FILE) == @__FILE__
+    include("fileio.jl")
+    using ProgressBars
+    for name in ("annealed-short-diameter", "annealed-medium-diameter", "annealed-large-diameter",
+                 "cavemen-10-10", "example-cgg")
+        M = read_adj_list("../graphs/$name.txt")
+        N = size(M, 1)
+        β = .15
+        τ = 5
+        results = [N - simulate_static(M, β, τ, 1) for i ∈ ProgressBar(1:2000)]
+        PyPlot.title("$name Susceptible Agents")
+        PyPlot.hist(results)
+        PyPlot.show()
+    end
 end
