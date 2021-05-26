@@ -52,8 +52,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     include("fileio.jl")
     using ProgressBars
-    for name in ("annealed-short-diameter", "annealed-medium-diameter", "annealed-large-diameter",
-                 "cavemen-10-10", "example-cgg")
+    for name in ("agent-generated-500", "cavemen-50-10", "cgg-520", "elitist-500-500")
         M = read_adj_list("../graphs/$name.txt")
         N = size(M, 1)
         β = .15
@@ -61,6 +60,8 @@ if abspath(PROGRAM_FILE) == @__FILE__
         results = [N - simulate_static(M, β, τ, 1) for i ∈ ProgressBar(1:2000)]
         PyPlot.title("$name Susceptible Agents")
         PyPlot.hist(results)
-        PyPlot.show()
+        PyPlot.show(block=false)
+        PyPlot.figure()
     end
+    readline()
 end
