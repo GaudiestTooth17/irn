@@ -52,9 +52,9 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     include("fileio.jl")
     using ProgressBars
-    for name in ("agent-generated-500", "cavemen-50-10", "cgg-520", "elitist-500-500")
+    for name in ("annealed-agent-generated-500",)
         M = read_adj_list("../graphs/$name.txt")
-        N = size(M, 1)
+        local N = size(M, 1)
         β = .15
         τ = 5
         results = [N - simulate_static(M, β, τ, 1) for i ∈ ProgressBar(1:2000)]
