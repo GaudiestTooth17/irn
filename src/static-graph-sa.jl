@@ -13,6 +13,9 @@ include("lib-sim.jl")
 include("percolation-sim.jl")
 include("betweeness.jl")
 
+"""
+The goal is to find a connected graph with the fewest edges possible.
+"""
 function sparse_graph_objective(ϵ)
     G = Graph(encoding_to_adj_matrix(ϵ))
     return if !is_connected(G)
@@ -22,6 +25,11 @@ function sparse_graph_objective(ϵ)
     end
 end
 
+"""
+This neighbor function chooses an edge to toggle, toggles it, and returns the new encoding.
+It also keeps track of the edges it has tried toggling. If all the edges get tried for
+a certain encoding, it will always return that encoding.
+"""
 function make_neighbor_explorer()::Function
     encoding_to_tried_edges = Dict{Encoding, Set{Int}}()
     function network_neighbor(ϵ::Encoding)::Encoding
@@ -31,10 +39,7 @@ function make_neighbor_explorer()::Function
         elseif length(encoding_to_tried_edges[ϵ]) == length(ϵ)
             return ϵ
         end
-        edge = rand(1:length(ϵ))
-        while edge in encoding_to_tried_edges[ϵ]
-            edge = rand(1:length(ϵ))
-        end
+        edge = rand(setdiff(Set(1:length(ϵ)), encoding_to_tried_edges[ϵ]))
         push!(encoding_to_tried_edges[ϵ], edge)
         neighbor = copy(ϵ)
         neighbor[edge] = 1 - neighbor[edge]
@@ -43,6 +48,10 @@ function make_neighbor_explorer()::Function
     network_neighbor
 end
 
+"""
+This is a simplified version of the closure from make_neighbor_explorer that doesn't
+keep track of what has been tried.
+"""
 function network_neighbor(ϵ::Encoding)::Encoding
     edge = rand(1:length(ϵ))
     neighbor = copy(ϵ)
@@ -50,6 +59,9 @@ function network_neighbor(ϵ::Encoding)::Encoding
     neighbor
 end
 
+"""
+Similar to network_neighbor, but toggles 5 edges.
+"""
 function farther_network_neighbor(ϵ::Encoding)::Encoding
     # edges = [rand(1:length(ϵ)) for i=1:rand(1:100)]
     edges = [rand(1:length(ϵ)) for i=1:5]
@@ -58,6 +70,10 @@ function farther_network_neighbor(ϵ::Encoding)::Encoding
     neighbor
 end
 
+"""
+Instead of choosing an edge to toggle, this finds an active edge, disables it, and enables
+some disabled edge.
+"""
 function perm_network_neighbor(ϵ::Encoding)::Encoding
     edge_index = rand(findall(!iszero, ϵ))
     no_edge_index = rand(findall(iszero, ϵ))
@@ -68,8 +84,6 @@ function perm_network_neighbor(ϵ::Encoding)::Encoding
 end
 
 function make_resilient_objective()
-    # NOTE: After lots of experimentation, it appears that SA needs the difference between
-    # energies to be pretty high to work well. I.E. having them range from 0 to 1, isn't enough.
     rated_networks = Dict{Encoding, Float64}()
     function resilient_objective(encoding::Encoding)::Float64
         if encoding in keys(rated_networks)
@@ -99,6 +113,9 @@ function make_resilient_objective()
     end
 end
 
+"""
+The only goal is to stop infection.
+"""
 function make_no_spread_objective()
     rated_networks = Dict{Encoding, Float64}()
     function objective(ϵ::Encoding)
@@ -124,6 +141,10 @@ function make_no_spread_objective()
     objective
 end
 
+"""
+Maximize the betweeness centrality of num_edges edges. In practice it seems like it makes
+2*num_edges have high centrality.
+"""
 function make_high_betweeness_objective(num_edges::Int, diameter_weight::Float64)::Function
     rated_networks = Dict{Encoding, Float64}()
     function objective(ϵ::Encoding)::Float64
@@ -144,6 +165,9 @@ function make_high_betweeness_objective(num_edges::Int, diameter_weight::Float64
     objective
 end
 
+"""
+Calculate the proportion of neighbors u has that v also has.
+"""
 function calc_prop_common_neighbors(G::Graph, u::Int, v::Int)::Float64
     u_neighbors = Set(neighbors(G, u))
     v_neighbors = Set(neighbors(G, v))
