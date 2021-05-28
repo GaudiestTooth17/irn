@@ -299,16 +299,18 @@ function find_resilient_spatial_network(max_steps::Int, T₀::Float64,
                                         edge_value::Float64, infection_value::Int)::Matrix{Int}
     start_time = Dates.now()
     println("Beginning.")
-    grid_size = 400
+    grid_size = 200
     n_agents = 500
-    ϵ₀ = shuffle([if i <= n_agents Int8(30) else Int8(0) end for i ∈ 1:grid_size^2])
+    ϵ₀ = shuffle([if i <= n_agents Int8(15) else Int8(0) end for i ∈ 1:grid_size^2])
     optimizer_step = make_sa_optimizer(make_social_circles_objective(edge_value, infection_value),
                                        make_fast_schedule(T₀), perm_network_neighbor, ϵ₀)
     best_ϵ = missing
     energies = zeros(max_steps)
-    for i ∈ ProgressBar(1:max_steps)
+    pbar = ProgressBar(1:max_steps)
+    for i ∈ pbar
         best_ϵ, energy = optimizer_step()
         energies[i] = energy
+        set_description(pbar, string(@sprintf("Energy: %.3f", energy)))
     end
     println("Done. ($(Dates.now()-start_time))")
     PyPlot.plot(energies)
