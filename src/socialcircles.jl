@@ -65,7 +65,7 @@ function search_for_neighbors(grid::Matrix{Int}, x::Int, y::Int)::Set{Tuple{Int,
     neighbors
 end
 
-function find_agents_in_mutual_range(grid::Matrix{Int}, x::Int, y::Int)::Set{Tuple{Int}}
+function find_agents_in_mutual_range(grid::Matrix, x::Int, y::Int)::Set{Tuple{Int, Int}}
     """
     Search for all of the agents in range of (x, y) who can also reach (x, y).
     """
@@ -88,7 +88,7 @@ function find_agents_in_mutual_range(grid::Matrix{Int}, x::Int, y::Int)::Set{Tup
     neighbors
 end
 
-function grid_to_adjacency_matrix(grid::Matrix{Int})::Matrix{Int}
+function grid_to_adjacency_matrix(grid::Matrix)::Matrix{Int}
     agent_locations = Tuple.(findall(>(0), grid))
     loc_to_id = Dict(loc=>id for (id, loc) in enumerate(agent_locations))
     N = length(agent_locations)

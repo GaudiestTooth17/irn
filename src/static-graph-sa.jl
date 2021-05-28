@@ -12,6 +12,7 @@ include("net-encode-lib.jl")
 include("lib-sim.jl")
 include("percolation-sim.jl")
 include("betweeness.jl")
+include("socialcircles.jl")
 
 """
 The goal is to find a connected graph with the fewest edges possible.
@@ -78,8 +79,8 @@ function perm_network_neighbor(ϵ::Encoding)::Encoding
     edge_index = rand(findall(!iszero, ϵ))
     no_edge_index = rand(findall(iszero, ϵ))
     neighbor = copy(ϵ)
-    neighbor[edge_index] = 0
-    neighbor[no_edge_index] = 1
+    # perform a swap instead of a assigning to 1 because other nonzero numbers may be in use.
+    neighbor[edge_index], neighbor[no_edge_index] = neighbor[no_edge_index], neighbor[edge_index]
     neighbor
 end
 
@@ -254,7 +255,7 @@ function find_sparse_connected_graph(max_steps=500, T₀=100.0)
 
     best_ϵ = missing
     energies = zeros(max_steps)
-    pbar = ProgressBar(1:max_steps)
+    # pbar = ProgressBar(1:max_steps)
     # for step in pbar
     for step = 1:max_steps
         best_ϵ, energy = optimizer_step()
@@ -264,6 +265,55 @@ function find_sparse_connected_graph(max_steps=500, T₀=100.0)
     PyPlot.plot(energies)
     PyPlot.show()
     best_ϵ
+end
+
+"""
+edge_value and infection_value represent how much the objective cares about each edge
+and each infection. The encoding passed to objective should be for a social circles grid,
+NOT an adjacency matrix!
+"""
+function make_social_circles_objective(edge_value::Float64, infection_value::Int)::Function
+    ϵ_to_energy = Dict{Encoding, Float64}()
+    function objective(ϵ::Encoding)
+        if haskey(ϵ_to_energy, ϵ)
+            return ϵ_to_energy[ϵ]
+        end
+        grid_size = Int(sqrt(length(ϵ)))
+        grid = reshape(ϵ, (grid_size, grid_size))
+        M = grid_to_adjacency_matrix(grid)
+        n_edges = sum(M) ÷ 2
+        results = [simulate_static(M, .2, 5, .01) for _=1:2000]
+        avg_infections = average(results)
+        ϵ_to_energy[ϵ] = avg_infections*infection_value - n_edges*edge_value
+        ϵ_to_energy[ϵ]
+    end
+    objective
+end
+
+"""
+This SA function is a little different than the others because the encodings represent
+the placement of agents with the same reach on a social circles grid. It returns an adjacency
+matrix instead of an encoding for one.
+"""
+function find_resilient_spatial_network(max_steps::Int, T₀::Float64,
+                                        edge_value::Float64, infection_value::Int)::Matrix{Int}
+    start_time = Dates.now()
+    println("Beginning.")
+    grid_size = 400
+    n_agents = 500
+    ϵ₀ = shuffle([if i <= n_agents Int8(30) else Int8(0) end for i ∈ 1:grid_size^2])
+    optimizer_step = make_sa_optimizer(make_social_circles_objective(edge_value, infection_value),
+                                       make_fast_schedule(T₀), perm_network_neighbor, ϵ₀)
+    best_ϵ = missing
+    energies = zeros(max_steps)
+    for i ∈ ProgressBar(1:max_steps)
+        best_ϵ, energy = optimizer_step()
+        energies[i] = energy
+    end
+    println("Done. ($(Dates.now()-start_time))")
+    PyPlot.plot(energies)
+    PyPlot.show()
+    grid_to_adjacency_matrix(reshape(best_ϵ, (grid_size, grid_size)))
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
