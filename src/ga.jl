@@ -8,7 +8,7 @@ Genotype = Vector
 Population = Vector{Genotype}
 
 """
-make_optimizer aggregates its parameters to create a closure that acts as the body of a GA optimization loop
+make_optimizer combines its parameters to create a closure that acts as the body of a GA optimization loop
 fitness_fn takes a genotype and returns a fitness value. This must not exceed max_fitness.
 next_gen_fn takes the maximum fitness a genotype can have and sorted list of (fitness, genotype) ordered from
 highest to lowest fitness and returns a vector of genotypes to be the next generation.

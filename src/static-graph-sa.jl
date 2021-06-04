@@ -273,6 +273,7 @@ and each infection. The encoding passed to objective should be for a social circ
 NOT an adjacency matrix!
 """
 function make_social_circles_objective(edge_value::Float64, infection_value::Int)::Function
+    # with my handwaving empirical test, it appears that this provides a signficant (~2x ish) speed up
     ϵ_to_energy = Dict{Encoding, Float64}()
     function objective(ϵ::Encoding)
         if haskey(ϵ_to_energy, ϵ)
@@ -299,9 +300,9 @@ function find_resilient_spatial_network(max_steps::Int, T₀::Float64,
                                         edge_value::Float64, infection_value::Int)::Matrix{Int}
     start_time = Dates.now()
     println("Beginning.")
-    grid_size = 200
+    grid_size = 400
     n_agents = 500
-    ϵ₀ = shuffle([if i <= n_agents Int8(15) else Int8(0) end for i ∈ 1:grid_size^2])
+    ϵ₀ = shuffle([if i <= n_agents Int8(30) else Int8(0) end for i ∈ 1:grid_size^2])
     optimizer_step = make_sa_optimizer(make_social_circles_objective(edge_value, infection_value),
                                        make_fast_schedule(T₀), perm_network_neighbor, ϵ₀)
     best_ϵ = missing

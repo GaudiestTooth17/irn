@@ -53,7 +53,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     include("fileio.jl")
     using ProgressBars
     for name in ("annealed-agent-generated-500",)
-        M = read_adj_list("../graphs/$name.txt")
+        local M = read_adj_list("../graphs/$name.txt")
         local N = size(M, 1)
         β = .15
         τ = 5
